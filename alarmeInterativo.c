@@ -125,6 +125,7 @@ void draw_timer_display(uint segundos) {
     uint segs = segundos % 60;
     char tempo_str[6];
     sprintf(tempo_str, "%02u:%02u", minutos, segs);
+    printf("tempo ajustado para %02u:%02u\n", minutos, segs);
 
     ssd1306_draw_text(ssd, 32, 2, tempo_str); // Desenha o texto no meio da tela
     render_on_display(ssd, frame_area_ptr);
@@ -141,6 +142,7 @@ void gpio_irq_handler(uint gpio, uint32_t events){
     }else if(gpio == BTN_A && currentTime - lastTimeA > 200000){
         lastTimeA = currentTime;
         if (!timer_regressivo_ativo && tempo_em_segundos > 0){
+            printf("Timer setado para %02u:%02u\nCONTAGEM REGRESSIVA INICIADA!!\n", tempo_em_segundos/60, tempo_em_segundos%60);
             timer_regressivo_ativo = true;
             ledRgb(0, 1, 0);
         } 
@@ -176,13 +178,13 @@ void contagem_regressiva(){
     if (timer_regressivo_ativo) {
         
         uint64_t now = to_us_since_boot(get_absolute_time());
-    
         if (now - last_tick_us >= 1000000) { // 1 segundo
             last_tick_us = now;
     
             if (tempo_em_segundos > 0) {
                 tempo_em_segundos--;
                 draw_timer_display(tempo_em_segundos);
+                printf("restam %02u:%02u\n", tempo_em_segundos/60, tempo_em_segundos%60);
             } else {
                 timer_regressivo_ativo = false;
                 alarme_ativo = true;
@@ -249,7 +251,6 @@ int main() {
     
         xAnt = bar_x_pos;
         yAnt = bar_y_pos;
-        printf("%d\n", bar_y_pos);
         contagem_regressiva();
         sleep_ms(10);
     }
