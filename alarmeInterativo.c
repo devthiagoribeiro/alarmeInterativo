@@ -27,11 +27,11 @@
 #define WRAP 2000
 const uint I2C_SDA = 14;
 const uint I2C_SCL = 15;
-struct render_area *frame_area_ptr; //Variável global para conseguir manipular o display oled em qualquer função
+struct render_area *frame_area_ptr; 
 bool alarme_ativo = false;
-static volatile int lastTimeJoy = 0;//Variável para debouncing do botão do joystick
-static volatile int lastTimeA = 0; //Variável para debouncing do botão A
-static volatile int lastTimeB = 0; //Variável para debouncing do botão B
+static volatile int lastTimeJoy = 0;
+static volatile int lastTimeA = 0; 
+static volatile int lastTimeB = 0;
 char password[6];
 typedef enum {
     MODO_QUADRADO,
@@ -46,7 +46,7 @@ volatile bool readyToScan = false;
 PIO pio;
 uint sm;
 
-//criação das matrizes correspondentes a cada número a ser mostrado na matriz de leds
+//criação das matrizes correspondentes a cada seta a ser exibida na matriz de leds pio
 Matriz_leds_config Apoint = {
     //       Coluna 0          Coluna 1          Coluna 2          Coluna 3          Coluna 4
     //R    G    B       R    G    B       R    G    B       R    G    B       R    G    B
@@ -86,7 +86,6 @@ Matriz_leds_config clear = {
     {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}, // Linha 3
     {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}  // Linha 4
     };
-    
 
 //Função de inicialização dos periféricos usados no projeto
 struct render_area init(){
@@ -162,6 +161,7 @@ char passGenerator(char *senha) {
     }
 }
 
+//Exibe o padrão de setas toda vez que é chamada
 void showPass(){
     printf("Repita a sequencia de botoes indicada pelas setas\n");
     for (int i = 0; i < 5; i++) {
@@ -232,20 +232,19 @@ void draw_timer_display(uint segundos) {
 //rotina de interrupção dos botões
 void gpio_irq_handler(uint gpio, uint32_t events){
     uint32_t currentTime = to_us_since_boot(get_absolute_time());
-    //tratamento debouncing
     if(gpio == BTN_JOYSTICK && currentTime - lastTimeJoy > 200000){
         lastTimeJoy = currentTime;
         if(!timer_regressivo_ativo) modo_atual = (modo_atual == MODO_QUADRADO) ? MODO_TIMER : MODO_QUADRADO;
         if(modo_atual == MODO_TIMER) draw_timer_display(tempo_em_segundos);
     }else if(gpio == BTN_A && currentTime - lastTimeA > 200000){
         lastTimeA = currentTime;
-        if (!timer_regressivo_ativo && tempo_em_segundos > 0 && modo_atual == MODO_TIMER && !alarme_ativo){
+        if (!timer_regressivo_ativo && tempo_em_segundos > 0 && modo_atual == MODO_TIMER  && !alarme_ativo && !timer_regressivo_ativo){
             printf("Timer setado para %02u:%02u\nContagem regressiva iniciada!!\n", tempo_em_segundos/60, tempo_em_segundos%60);
             timer_regressivo_ativo = true;
             ledRgb(0, 1, 0);
             last_tick_us = to_us_since_boot(get_absolute_time());
         }
-    }else if(gpio == BTN_B && currentTime - lastTimeB > 200000 && modo_atual == MODO_TIMER){
+    }else if(gpio == BTN_B && currentTime - lastTimeB > 200000 && modo_atual == MODO_TIMER && !alarme_ativo && !timer_regressivo_ativo){
             lastTimeB = currentTime;
             readyToScan = !readyToScan;
     }
@@ -256,7 +255,6 @@ void alarme_thread() {
     uint slice_buzzer = pwm_gpio_to_slice_num(buzzerA);
     while (true) {
         if (alarme_ativo) {
-            // Alarme tocando
             pwm_set_wrap(slice_buzzer, 5000);
             pwm_set_gpio_level(buzzerA, 2500);
             pwm_set_gpio_level(buzzerB, 2500);
@@ -266,10 +264,9 @@ void alarme_thread() {
             pwm_set_gpio_level(buzzerB, 1500);
             sleep_ms(150);
         } else {
-            // Alarme desligado
             pwm_set_gpio_level(buzzerA, 0);
             pwm_set_gpio_level(buzzerB, 0);
-            sleep_ms(50); // Espera um pouco para não ocupar 100% da CPU
+            sleep_ms(50);
         }
     }
 }
@@ -280,10 +277,10 @@ void verify(){
                 for (int i = 0; i < 5; i++) {
                     while (1) {
                         if (!gpio_get(BTN_A)) {
-                            sleep_ms(20); // pequeno delay para estabilizar
+                            sleep_ms(20); 
                             imprimir_desenho(Apoint, pio, sm);
-                            if (!gpio_get(BTN_A)) { // confirma que ainda está pressionado
-                                while (!gpio_get(BTN_A)); // espera soltar
+                            if (!gpio_get(BTN_A)) { 
+                                while (!gpio_get(BTN_A));
                                 select = 'A';
                                 break;
                             }
@@ -306,7 +303,7 @@ void verify(){
                                 break;
                             }
                         }
-                        sleep_ms(10); // pequena pausa entre varreduras
+                        sleep_ms(10); 
                     }
                     imprimir_desenho(clear, pio, sm);
                 
@@ -316,11 +313,11 @@ void verify(){
                         showPass();
                     }
                 
-                    sleep_ms(200); // delay extra para evitar múltiplos toques
+                    sleep_ms(200); 
                 }
                 
                 alarme_ativo = false;
-                ledRgb(0, 0, 1);
+                ledRgb(1, 1, 0);
                 sleep_ms(50);
 }
 
@@ -329,7 +326,7 @@ void contagem_regressiva(){
     if (timer_regressivo_ativo) {
         
         uint64_t now = to_us_since_boot(get_absolute_time());
-        if (now - last_tick_us >= 1000000) { // 1 segundo
+        if (now - last_tick_us >= 1000000) {
             last_tick_us = now;
     
             if (tempo_em_segundos > 0) {
@@ -339,9 +336,9 @@ void contagem_regressiva(){
             } else {
                 timer_regressivo_ativo = false;
                 alarme_ativo = true;
+                ledRgb(1, 0 ,0);
                 passGenerator(password);
                 showPass();
-                ledRgb(1, 0 ,0);
                 verify();
             }
         }
@@ -350,6 +347,7 @@ void contagem_regressiva(){
 }
 
 int main() {
+    //variáveis para a leitura do tempo via UART
     char m1, m2, s1, s2;
     // Inicializa as interfaces de entrada e saída padrão (UART)
     stdio_init_all();
@@ -366,9 +364,10 @@ int main() {
     sm = configurar_matriz(pio);
     //Armazenam as posições anteriores dos potenciometros para detectar se houve mudança
     uint xAnt, yAnt;
-    ledRgb(0, 0, 1);
+    ledRgb(1, 1, 0);
     // Inicia o loop infinito para leitura e exibição dos valores do joystick
     while (1) {
+        //Caso o botão B tenha sido pressionado durante a tela do timer, habilita a leitura via UART
         if(readyToScan){
             printf("Digite um tempo no formato MM:SS\n");
             scanf(" %c%c:%c%c", &m1, &m2, &s1, &s2);
@@ -378,6 +377,7 @@ int main() {
             draw_timer_display(tempo_em_segundos);
             readyToScan = !readyToScan;
         }
+        //Leitura e tratamento do joystick
         adc_select_input(1); // eixo X
         uint adc_x_raw = adc_read();
         
@@ -389,11 +389,11 @@ int main() {
         uint bar_x_pos = adc_x_raw * bar_width / adc_max;
         uint bar_y_pos = adc_y_raw * bar_width / adc_max;
     
+        //Exibição das informações no display OLED
         if (modo_atual == MODO_QUADRADO) {
             if(bar_x_pos != xAnt || bar_y_pos != yAnt) draw_joystick_square(bar_x_pos, bar_y_pos);
         } else if (modo_atual == MODO_TIMER && !timer_regressivo_ativo) {
-            // Se o joystick for movido para cima ou para baixo
-            if (bar_y_pos > 20 && bar_y_pos < 30 && tempo_em_segundos < 5999) { // Limite: 99 minutos 59 segundos
+            if (bar_y_pos > 20 && bar_y_pos < 30 && tempo_em_segundos < 5999) { 
                 tempo_em_segundos += 1;
                 draw_timer_display(tempo_em_segundos);
             } else if (bar_y_pos < 16  && bar_y_pos > 8 && tempo_em_segundos > 0) {
@@ -411,6 +411,8 @@ int main() {
     
         xAnt = bar_x_pos;
         yAnt = bar_y_pos;
+        
+        //Caso o timer tenha sido ligado, é dado o inicio da contagem regressiva
         contagem_regressiva();
         sleep_ms(10);
     }
