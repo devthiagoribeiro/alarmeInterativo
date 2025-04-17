@@ -31,6 +31,7 @@ struct render_area *frame_area_ptr; //Variável global para conseguir manipular 
 bool alarme_ativo = false;
 static volatile int lastTimeJoy = 0;//Variável para debouncing do botão do joystick
 static volatile int lastTimeA = 0; //Variável para debouncing do botão A
+static volatile int lastTimeB = 0; //Variável para debouncing do botão B
 char password[6];
 typedef enum {
     MODO_QUADRADO,
@@ -41,6 +42,7 @@ static uint64_t last_tick_us = 0;
 volatile modo_t modo_atual = MODO_QUADRADO;
 static volatile uint tempo_em_segundos = 0;
 volatile bool timer_regressivo_ativo = false;
+volatile bool readyToScan = false;
 PIO pio;
 uint sm;
 
@@ -161,6 +163,7 @@ char passGenerator(char *senha) {
 }
 
 void showPass(){
+    printf("Repita a sequencia de botoes indicada pelas setas\n");
     for (int i = 0; i < 5; i++) {
         switch (password[i])
         {
@@ -236,12 +239,15 @@ void gpio_irq_handler(uint gpio, uint32_t events){
         if(modo_atual == MODO_TIMER) draw_timer_display(tempo_em_segundos);
     }else if(gpio == BTN_A && currentTime - lastTimeA > 200000){
         lastTimeA = currentTime;
-        if (!timer_regressivo_ativo && tempo_em_segundos > 0 && modo_atual == MODO_TIMER){
-            printf("Timer setado para %02u:%02u\nCONTAGEM REGRESSIVA INICIADA!!\n", tempo_em_segundos/60, tempo_em_segundos%60);
+        if (!timer_regressivo_ativo && tempo_em_segundos > 0 && modo_atual == MODO_TIMER && !alarme_ativo){
+            printf("Timer setado para %02u:%02u\nContagem regressiva iniciada!!\n", tempo_em_segundos/60, tempo_em_segundos%60);
             timer_regressivo_ativo = true;
             ledRgb(0, 1, 0);
-        } 
-        last_tick_us = to_us_since_boot(get_absolute_time());
+            last_tick_us = to_us_since_boot(get_absolute_time());
+        }
+    }else if(gpio == BTN_B && currentTime - lastTimeB > 200000 && modo_atual == MODO_TIMER){
+            lastTimeB = currentTime;
+            readyToScan = !readyToScan;
     }
 }
 
@@ -305,7 +311,7 @@ void verify(){
                     imprimir_desenho(clear, pio, sm);
                 
                     if (select != password[i]) {
-                        printf("Você errou a sequência\n");
+                        printf("Você errou a sequência, tente novamente\n");
                         i = -1;
                         showPass();
                     }
@@ -315,6 +321,7 @@ void verify(){
                 
                 alarme_ativo = false;
                 ledRgb(0, 0, 1);
+                sleep_ms(50);
 }
 
 //Rotina de contagem regressiva do alarme
@@ -334,7 +341,6 @@ void contagem_regressiva(){
                 alarme_ativo = true;
                 passGenerator(password);
                 showPass();
-                printf("%s\n", password);
                 ledRgb(1, 0 ,0);
                 verify();
             }
@@ -344,6 +350,7 @@ void contagem_regressiva(){
 }
 
 int main() {
+    char m1, m2, s1, s2;
     // Inicializa as interfaces de entrada e saída padrão (UART)
     stdio_init_all();
     //Inicializa os periféricos e tem como retorno o frame area
@@ -353,6 +360,7 @@ int main() {
     //Ativa as interrupções com callback para os botões A e Joystick
     gpio_set_irq_enabled_with_callback(BTN_JOYSTICK, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
     gpio_set_irq_enabled_with_callback(BTN_A, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
+    gpio_set_irq_enabled_with_callback(BTN_B, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
     //inicialização da matriz de leds
     pio = pio0;
     sm = configurar_matriz(pio);
@@ -361,6 +369,15 @@ int main() {
     ledRgb(0, 0, 1);
     // Inicia o loop infinito para leitura e exibição dos valores do joystick
     while (1) {
+        if(readyToScan){
+            printf("Digite um tempo no formato MM:SS\n");
+            scanf(" %c%c:%c%c", &m1, &m2, &s1, &s2);
+            int min = ((m1-'0')*10) + (m2-'0');
+            int sec = ((s1-'0')*10) + (s2-'0');
+            tempo_em_segundos = (min*60)+sec;
+            draw_timer_display(tempo_em_segundos);
+            readyToScan = !readyToScan;
+        }
         adc_select_input(1); // eixo X
         uint adc_x_raw = adc_read();
         
