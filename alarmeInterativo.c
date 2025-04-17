@@ -8,7 +8,7 @@
 #include "hardware/i2c.h"
 #include "pico/multicore.h"
 #include "hardware/pio.h"
-#include "matriz_leds.h"
+#include "inc/matriz_leds.h"
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
