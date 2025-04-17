@@ -49,17 +49,16 @@ O projeto visa consolidar conhecimentos sobre:
 
 3. Faça o upload do binário .uf2 gerado para a Pico.
 
-    ▶️ Execução
+    ### ▶️ Execução
     
-    Acompanhe os logs e mensagens pelo terminal serial (UART).
+    - Acompanhe os logs e mensagens pelo terminal serial (UART).
 
-    Use o botão do joystick para alternar entre modos.
+    - Use o botão do joystick para alternar entre modos.
 
-    No modo Timer, configure o tempo com o joystick ou pressione o botão B para entrada via UART.
+    - No modo Timer, configure o tempo com o joystick ou pressione o botão B para entrada via UART.
 
-    Pressione o botão A para iniciar a contagem regressiva.
+    - Pressione o botão A para iniciar a contagem regressiva.
 
-    Após o alarme, repita a sequência exibida na matriz de LEDs para desativá-lo.
+    - Após o alarme, repita a sequência exibida na matriz de LEDs para desativá-lo.
 
-#🎥 Vídeo Demonstrativo
-[🔗 Inserir link aqui para o vídeo no YouTube ou Google Drive]
+# 🎥 Vídeo Demonstrativo (link)[🔗 Inserir link aqui para o vídeo no YouTube ou Google Drive]
