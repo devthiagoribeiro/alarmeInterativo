@@ -8,6 +8,7 @@
 #include "hardware/i2c.h"
 #include "pico/multicore.h"
 #include <string.h>
+#include <stdlib.h>
 #include <time.h>
 
 // Definição de macros e variáveis globais
@@ -28,6 +29,7 @@ struct render_area *frame_area_ptr; //Variável global para conseguir manipular 
 bool alarme_ativo = false;
 static volatile int lastTimeJoy = 0;//Variável para debouncing do botão do joystick
 static volatile int lastTimeA = 0; //Variável para debouncing do botão A
+char password[6];
 typedef enum {
     MODO_QUADRADO,
     MODO_TIMER
@@ -95,6 +97,26 @@ struct render_area init(){
     return frame_area;
 }
 
+//Função para definir estado dos leds rgb
+void ledRgb(int r, int g, int b){
+    gpio_put(LED_VERMELHO, r);
+    gpio_put(LED_VERDE, g);
+    gpio_put(LED_AZUL, b);
+}
+
+//Função responsável por gerar a "senha" para desativar o alarme
+char passGenerator(char *senha) {
+    char caracteres[] = {'A', 'B', 'J'};
+    
+    srand(time(NULL)); // Inicializa o gerador de números aleatórios
+    
+    for (int i = 0; i < 5; i++) {
+        senha[i] = caracteres[rand() % 3];
+    }
+
+    senha[5] = '\0'; // Termina a string
+}
+
 //Função responsável por imprimir no display oled o quadrado 8x8
 void draw_joystick_square(uint x_raw, uint y_raw) {
 
@@ -141,7 +163,7 @@ void gpio_irq_handler(uint gpio, uint32_t events){
         if(modo_atual == MODO_TIMER) draw_timer_display(tempo_em_segundos);
     }else if(gpio == BTN_A && currentTime - lastTimeA > 200000){
         lastTimeA = currentTime;
-        if (!timer_regressivo_ativo && tempo_em_segundos > 0){
+        if (!timer_regressivo_ativo && tempo_em_segundos > 0 && modo_atual == MODO_TIMER){
             printf("Timer setado para %02u:%02u\nCONTAGEM REGRESSIVA INICIADA!!\n", tempo_em_segundos/60, tempo_em_segundos%60);
             timer_regressivo_ativo = true;
             ledRgb(0, 1, 0);
@@ -173,6 +195,54 @@ void alarme_thread() {
     }
 }
 
+//Função que verifica a senha
+void verify(){
+    char select;
+                for (int i = 0; i < 5; i++) {
+                    while (1) {
+                        if (!gpio_get(BTN_A)) {
+                            sleep_ms(20); // pequeno delay para estabilizar
+                            if (!gpio_get(BTN_A)) { // confirma que ainda está pressionado
+                                while (!gpio_get(BTN_A)); // espera soltar
+                                select = 'A';
+                                break;
+                            }
+                        }
+                        else if (!gpio_get(BTN_B)) {
+                            sleep_ms(20);
+                            if (!gpio_get(BTN_B)) {
+                                while (!gpio_get(BTN_B));
+                                select = 'B';
+                                break;
+                            }
+                        }
+                        else if (!gpio_get(BTN_JOYSTICK)) {
+                            sleep_ms(20);
+                            if (!gpio_get(BTN_JOYSTICK)) {
+                                while (!gpio_get(BTN_JOYSTICK));
+                                select = 'J';
+                                break;
+                            }
+                        }
+                
+                        sleep_ms(10); // pequena pausa entre varreduras
+                    }
+                
+                    printf("tentativa: %c | correto: %c\n", select, password[i]);
+                
+                    if (select != password[i]) {
+                        printf("Você errou a sequência\n");
+                        i = -1; // vai virar 0 na próxima iteração do for (por causa do i++)
+                        // você pode adicionar lógica para repetir a sequência aqui
+                    }
+                
+                    sleep_ms(200); // delay extra para evitar múltiplos toques
+                }
+                
+                alarme_ativo = false;
+                ledRgb(0, 0, 1);
+}
+
 //Rotina de contagem regressiva do alarme
 void contagem_regressiva(){
     if (timer_regressivo_ativo) {
@@ -188,18 +258,14 @@ void contagem_regressiva(){
             } else {
                 timer_regressivo_ativo = false;
                 alarme_ativo = true;
+                passGenerator(password);
+                printf("%s\n", password);
                 ledRgb(1, 0 ,0);
+                verify();
             }
         }
     }
     
-}
-
-//Função para definir estado dos leds rgb
-void ledRgb(int r, int g, int b){
-    gpio_put(LED_VERMELHO, r);
-    gpio_put(LED_VERDE, g);
-    gpio_put(LED_AZUL, b);
 }
 
 int main() {
@@ -243,7 +309,7 @@ int main() {
                 tempo_em_segundos += 2;
                 draw_timer_display(tempo_em_segundos);
             }else if (bar_y_pos < 8 && tempo_em_segundos > 0) {
-                tempo_em_segundos -= 2;
+                (tempo_em_segundos>= 2)?tempo_em_segundos -= 2:tempo_em_segundos--;
                 draw_timer_display(tempo_em_segundos);
             }
             sleep_ms(140);
