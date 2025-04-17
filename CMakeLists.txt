@@ -32,11 +32,13 @@ project(alarmeInterativo C CXX ASM)
 
 pico_sdk_init()
 
-add_executable(alarmeInterativo alarmeInterativo.c inc/ssd1306_i2c.c)
+add_executable(alarmeInterativo alarmeInterativo.c inc/ssd1306_i2c.c matriz_leds.c)
 
 pico_set_program_name(alarmeInterativo "alarmeInterativo")
 
 pico_set_program_version(alarmeInterativo "0.1")
+# Generate PIO header
+pico_generate_pio_header(${CMAKE_PROJECT_NAME} ${CMAKE_CURRENT_LIST_DIR}/pio_matrix.pio)
 
 pico_enable_stdio_uart(alarmeInterativo 1)
 pico_enable_stdio_usb(alarmeInterativo 1)
@@ -47,7 +49,8 @@ target_link_libraries(alarmeInterativo
         hardware_pwm
         hardware_clocks
         hardware_i2c
-        pico_multicore)
+        pico_multicore
+        hardware_pio)
 
 target_include_directories(alarmeInterativo PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}

@@ -7,6 +7,8 @@
 #include "inc/ssd1306.h"
 #include "hardware/i2c.h"
 #include "pico/multicore.h"
+#include "hardware/pio.h"
+#include "matriz_leds.h"
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
@@ -39,7 +41,50 @@ static uint64_t last_tick_us = 0;
 volatile modo_t modo_atual = MODO_QUADRADO;
 static volatile uint tempo_em_segundos = 0;
 volatile bool timer_regressivo_ativo = false;
+PIO pio;
+uint sm;
 
+//criação das matrizes correspondentes a cada número a ser mostrado na matriz de leds
+Matriz_leds_config Apoint = {
+    //       Coluna 0          Coluna 1          Coluna 2          Coluna 3          Coluna 4
+    //R    G    B       R    G    B       R    G    B       R    G    B       R    G    B
+    {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.05, 0.05, 0.05}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}, // Linha 0
+    {{0.0, 0.0, 0.0}, {0.05, 0.05, 0.05}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}, // Linha 1
+    {{0.05, 0.05, 0.05}, {0.05, 0.05, 0.05}, {0.05, 0.05, 0.05}, {0.05, 0.05, 0.05}, {0.05, 0.05, 0.05}}, // Linha 2
+    {{0.0, 0.0, 0.0}, {0.05, 0.05, 0.05}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}, // Linha 3
+    {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.05, 0.05, 0.05}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}  // Linha 4
+    };
+
+Matriz_leds_config Bpoint = {
+    //       Coluna 0          Coluna 1          Coluna 2          Coluna 3          Coluna 4
+    //R    G    B       R    G    B       R    G    B       R    G    B       R    G    B
+    {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.05, 0.05, 0.05}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}, // Linha 0
+    {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.05, 0.05, 0.05}, {0.0, 0.0, 0.0}}, // Linha 1
+    {{0.05, 0.05, 0.05}, {0.05, 0.05, 0.05}, {0.05, 0.05, 0.05}, {0.05, 0.05, 0.05}, {0.05, 0.05, 0.05}}, // Linha 2
+    {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.05, 0.05, 0.05}, {0.0, 0.0, 0.0}}, // Linha 3
+    {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.05, 0.05, 0.05}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}  // Linha 4
+    };
+
+Matriz_leds_config Jpoint = {
+    //       Coluna 0          Coluna 1          Coluna 2          Coluna 3          Coluna 4
+    //R    G    B       R    G    B       R    G    B       R    G    B       R    G    B
+    {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.05, 0.05, 0.05}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}, // Linha 0
+    {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.05, 0.05, 0.05}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}, // Linha 1
+    {{0.05, 0.05, 0.05}, {0.0, 0.0, 0.0}, {0.05, 0.05, 0.05}, {0.0, 0.0, 0.0}, {0.05, 0.05, 0.05}}, // Linha 2
+    {{0.0, 0.0, 0.0}, {0.05, 0.05, 0.05}, {0.05, 0.05, 0.05}, {0.05, 0.05, 0.05}, {0.0, 0.0, 0.0}}, // Linha 3
+    {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.05, 0.05, 0.05}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}  // Linha 4
+    };
+
+Matriz_leds_config clear = {
+    //       Coluna 0          Coluna 1          Coluna 2          Coluna 3          Coluna 4
+    //R    G    B       R    G    B       R    G    B       R    G    B       R    G    B
+    {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}, // Linha 0
+    {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}, // Linha 1
+    {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}, // Linha 2
+    {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}, // Linha 3
+    {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}  // Linha 4
+    };
+    
 
 //Função de inicialização dos periféricos usados no projeto
 struct render_area init(){
@@ -111,10 +156,38 @@ char passGenerator(char *senha) {
     srand(time(NULL)); // Inicializa o gerador de números aleatórios
     
     for (int i = 0; i < 5; i++) {
-        senha[i] = caracteres[rand() % 3];
+        senha[i] = caracteres[rand() % 3];  
     }
+}
 
-    senha[5] = '\0'; // Termina a string
+void showPass(){
+    for (int i = 0; i < 5; i++) {
+        switch (password[i])
+        {
+        case 'A':
+            imprimir_desenho(Apoint, pio, sm);
+            sleep_ms(500);
+            imprimir_desenho(clear, pio, sm);
+            break;
+        
+        case 'B':
+            imprimir_desenho(Bpoint, pio, sm);
+            sleep_ms(500);
+            imprimir_desenho(clear, pio, sm);
+            break;
+        
+        case 'J':
+            imprimir_desenho(Jpoint, pio, sm);
+            sleep_ms(500);
+            imprimir_desenho(clear, pio, sm);
+            break;
+        
+        default:
+            break;
+        }
+        sleep_ms(100);    
+    }
+    imprimir_desenho(clear, pio, sm);
 }
 
 //Função responsável por imprimir no display oled o quadrado 8x8
@@ -202,6 +275,7 @@ void verify(){
                     while (1) {
                         if (!gpio_get(BTN_A)) {
                             sleep_ms(20); // pequeno delay para estabilizar
+                            imprimir_desenho(Apoint, pio, sm);
                             if (!gpio_get(BTN_A)) { // confirma que ainda está pressionado
                                 while (!gpio_get(BTN_A)); // espera soltar
                                 select = 'A';
@@ -210,6 +284,7 @@ void verify(){
                         }
                         else if (!gpio_get(BTN_B)) {
                             sleep_ms(20);
+                            imprimir_desenho(Bpoint, pio, sm);
                             if (!gpio_get(BTN_B)) {
                                 while (!gpio_get(BTN_B));
                                 select = 'B';
@@ -218,22 +293,21 @@ void verify(){
                         }
                         else if (!gpio_get(BTN_JOYSTICK)) {
                             sleep_ms(20);
+                            imprimir_desenho(Jpoint, pio, sm);
                             if (!gpio_get(BTN_JOYSTICK)) {
                                 while (!gpio_get(BTN_JOYSTICK));
                                 select = 'J';
                                 break;
                             }
                         }
-                
                         sleep_ms(10); // pequena pausa entre varreduras
                     }
-                
-                    printf("tentativa: %c | correto: %c\n", select, password[i]);
+                    imprimir_desenho(clear, pio, sm);
                 
                     if (select != password[i]) {
                         printf("Você errou a sequência\n");
-                        i = -1; // vai virar 0 na próxima iteração do for (por causa do i++)
-                        // você pode adicionar lógica para repetir a sequência aqui
+                        i = -1;
+                        showPass();
                     }
                 
                     sleep_ms(200); // delay extra para evitar múltiplos toques
@@ -259,6 +333,7 @@ void contagem_regressiva(){
                 timer_regressivo_ativo = false;
                 alarme_ativo = true;
                 passGenerator(password);
+                showPass();
                 printf("%s\n", password);
                 ledRgb(1, 0 ,0);
                 verify();
@@ -278,7 +353,9 @@ int main() {
     //Ativa as interrupções com callback para os botões A e Joystick
     gpio_set_irq_enabled_with_callback(BTN_JOYSTICK, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
     gpio_set_irq_enabled_with_callback(BTN_A, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
-
+    //inicialização da matriz de leds
+    pio = pio0;
+    sm = configurar_matriz(pio);
     //Armazenam as posições anteriores dos potenciometros para detectar se houve mudança
     uint xAnt, yAnt;
     ledRgb(0, 0, 1);
