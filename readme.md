@@ -61,4 +61,6 @@ O projeto visa consolidar conhecimentos sobre:
 
     - Após o alarme, repita a sequência exibida na matriz de LEDs para desativá-lo.
 
-# 🎥 Vídeo Demonstrativo (link)[🔗 Inserir link aqui para o vídeo no YouTube ou Google Drive]
+## Demonstração
+
+**🎥[Clique para assistir o vídeo](https://youtu.be/_Vkb3JZ9jAA?feature=shared)**
