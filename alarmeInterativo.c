@@ -309,6 +309,7 @@ void verify(){
                 
                     if (select != password[i]) {
                         printf("Você errou a sequência, tente novamente\n");
+                        sleep_ms(1000);
                         i = -1;
                         showPass();
                     }
